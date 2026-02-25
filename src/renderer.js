@@ -25,9 +25,9 @@
  *  });
  * ```
  */
+// src/renderer.js (这是前端入口，负责加载 Vue 界面)
+import { createApp } from 'vue'
+import App from './App.vue' 
 
-import './index.css';
-
-console.log(
-  '👋 This message is being logged by "renderer.js", included via Vite',
-);
+// 创建 Vue 实例并挂载到网页的 <div id="app"></div> 上
+createApp(App).mount('#app')

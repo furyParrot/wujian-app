@@ -1,13 +1,15 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>Hello World!</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>恒流源控制台</title>
   </head>
   <body>
-    <h1>💖 Hello World!</h1>
-    <p>Welcome to your Electron application.</p>
+    <!-- Vue 挂载容器 -->
+    <div id="app"></div>
+    
+    <!-- 注意这里：改成引入 renderer.js，绝对不要引入 main.js！！！ -->
     <script type="module" src="/src/renderer.js"></script>
   </body>
 </html>
