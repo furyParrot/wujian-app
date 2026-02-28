@@ -17,8 +17,8 @@ if (started) {
 const createWindow = () => {
   // 2. 这里千万不要加 const！直接给全局变量赋值
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 1400,
+    width: 1000,
+    height: 1300,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // 允许在渲染进程使用 node api (根据你的模板配置而定)

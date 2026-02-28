@@ -286,7 +286,7 @@ function getU32(arr, idx) { return (arr[idx] | (arr[idx+1]<<8) | (arr[idx+2]<<16
 const refreshPorts = async () => {
   if (isConnected.value) return;
   const ports = await window.electronAPI.getPorts();
-  availablePorts.value = ports.filter(p => p.toLowerCase().includes('usbserial'));
+  availablePorts.value = ports.filter(p => p.toLowerCase().includes('usb'));
   if (availablePorts.value.length > 0 && !availablePorts.value.includes(selectedPort.value)) {
     selectedPort.value = availablePorts.value[0];
   } else if (availablePorts.value.length === 0) {
