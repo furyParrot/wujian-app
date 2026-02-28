@@ -22,19 +22,15 @@
 
       <!-- 第二行：仪表台 -->
       <div class="row row-2">
-        <!-- 第 1 个仪表：电压表 -->
         <div class="gauge-box">
           <span class="gauge-title">当前输入电压</span>
           <div ref="chartVoltage" class="chart"></div>
           <div class="value-text">{{ (sysInVoltage).toFixed(1) }} V</div>
         </div>
-        
-        <!-- 第 2 个仪表：横向温度计 1 -->
         <div class="gauge-box">
           <span class="gauge-title">热敏电阻 1</span>
           <div class="thermo-container">
             <div class="thermo-track">
-              <!-- 底色是冷暖渐变，上面一层通过调整宽度来遮挡未达到的温度 -->
               <div class="thermo-gradient"></div>
               <div class="thermo-cover" :style="{ width: getThermoCoverWidth(temp1) }"></div>
             </div>
@@ -44,8 +40,6 @@
           </div>
           <div class="value-text">T1: {{ temp1.toFixed(1) }}℃</div>
         </div>
-
-        <!-- 第 3 个仪表：横向温度计 2 -->
         <div class="gauge-box">
           <span class="gauge-title">热敏电阻 2</span>
           <div class="thermo-container">
@@ -59,25 +53,34 @@
           </div>
           <div class="value-text">T2: {{ temp2.toFixed(1) }}℃</div>
         </div>
-
-        <!-- 第 4 个仪表：外触发波形 -->
         <div class="gauge-box wave-box">
           <span class="gauge-title">外触发信号</span>
           <div ref="chartWave" class="chart wave-chart"></div>
         </div>
       </div>
 
-      <!-- 第三行：强电总开关 -->
-      <div class="row row-3">
+      <!-- 第三行：强电总开关与故障报警区 -->
+      <div class="row row-3" :class="{ 'fault-bg': faultCode !== 0 }">
         <label class="switch-container">
           <span class="switch-label">强电总开关</span>
           <input type="checkbox" v-model="mainPowerSwitch" @change="onMainPowerChange" :disabled="!isConnected">
           <span class="slider"></span>
         </label>
+        
+        <!-- 致命故障提示 -->
+        <div v-if="faultCode !== 0" class="fault-box">
+          <span class="fault-text">⚠️ 系统保护锁定: {{ faultMsg }}</span>
+          <button class="btn-danger btn-clear" @click="clearFaults">尝试清障</button>
+        </div>
+
+        <!-- 警告提示（非致命） -->
+        <div v-if="warnCode !== 0 && faultCode === 0" class="warn-box">
+          <span class="warn-text">提示: {{ warnMsg }}</span>
+        </div>
       </div>
 
       <!-- 第四行：通道控制区 -->
-      <div class="row row-4" :class="{ 'disabled-area': !mainPowerSwitch || !isConnected }">
+      <div class="row row-4" :class="{ 'disabled-area': !mainPowerSwitch || !isConnected || faultCode !== 0 }">
         <!-- 通道 1 -->
         <div class="col channel-col">
           <h3 class="col-title">通道1</h3>
@@ -197,7 +200,7 @@ const selectedPort = ref('')
 const isConnected = ref(false)
 const uptime = ref(0)
 const sysInVoltage = ref(0)
-const temp1 = ref(100)
+const temp1 = ref(0)
 const temp2 = ref(0)
 const extTriggerHistory = reactive(Array(25).fill(0))
 const mainPowerSwitch = ref(false)
@@ -209,48 +212,38 @@ const logs = ref([])
 const latestTx = ref('')
 const latestRx = ref('')
 
+// 故障与警告状态
+const faultCode = ref(0)
+const faultMsg = ref('')
+const warnCode = ref(0)
+const warnMsg = ref('')
+
 const chartVoltage = ref(null), chartWave = ref(null)
 let eChartVoltage, eChartWave
 let pollingTimer = null
 let rxBuffer =[]
 
-// ======================== 温度计算逻辑 (NTC 插值查表法) ========================
-const NTC_TABLE = [
-  [-40,187.52],[-39,177.56], [-38,168.19],[-37,159.38], [-36,151.09],[-35,143.29], [-34,135.94], [-33,129.02], [-32,122.51], [-31,116.36],[-30,110.57], [-29,105.1],[-28,99.95], [-27,95.07],[-26,90.47], [-25,86.13], [-24,82.01],[-23,78.12], [-22,74.44],[-21,70.95], [-20,67.64], [-19,64.51],[-18,61.53], [-17,58.71],[-16,56.03], [-15,53.49],[-14,51.07], [-13,48.78], [-12,46.59],[-11,44.52], [-10,42.54],[-9,40.66], [-8,38.88], [-7,37.17],[-6,35.56], [-5,34.01], [-4,32.55],[-3,31.15], [-2,29.82],[-1,28.55], [0,27.35], [1,26.2],[2,25.1], [3,24.06], [4,23.07],[5,22.12], [6,21.21], [7,20.35], [8,19.52], [9,18.73],[10,17.98], [11,17.25], [12,16.64], [13,16.06], [14,15.49],[15,14.95], [16,14.42],[17,13.91], [18,13.42], [19,12.95],[20,12.5], [21,12.06],[22,11.63], [23,11.22], [24,10.83],[25,10.45], [26,10.08],[27,9.73], [28,9.38], [29,9.05],[30,8.74], [31,8.43],[32,8.13], [33,7.85], [34,7.57],[35,7.3], [36,7.05], [37,6.8],[38,6.56], [39,6.33], [40,6.11],[41,5.89], [42,5.69],[43,5.49], [44,5.29], [45,5.11],[46,4.93], [47,4.75], [48,4.59],[49,4.43], [50,4.27],[51,4.12], [52,3.97], [53,3.83],[54,3.7], [55,3.57], [56,3.44],[57,3.32], [58,3.21],[59,3.09], [60,2.98], [61,2.88],[62,2.78], [63,2.68], [64,2.59],[65,2.5], [66,2.4], [67,2.319], [68,2.248], [69,2.185],[70,2.126], [71,2.069],[72,2.013], [73,1.957], [74,1.901],[75,1.845], [76,1.789],[77,1.735], [78,1.686], [79,1.644], [80,1.612], [81,1.5541],[82,1.5191], [83,1.4864],[84,1.4557], [85,1.4269],[86,1.4], [87,1.3749], [88,1.3514],[89,1.3295], [90,1.309]
-]
+// ======= 并发请求解析管理机制 =======
+let resolveAuth = null;
+let resolveSync = null;
+let pendingVerifies =[]; 
 
+const NTC_TABLE = [[-40,187.52],[-39,177.56],[-38,168.19],[-37,159.38],[-36,151.09],[-35,143.29],[-34,135.94],[-33,129.02],[-32,122.51],[-31,116.36],[-30,110.57],[-29,105.1],[-28,99.95],[-27,95.07],[-26,90.47],[-25,86.13],[-24,82.01],[-23,78.12],[-22,74.44],[-21,70.95],[-20,67.64],[-19,64.51],[-18,61.53],[-17,58.71],[-16,56.03],[-15,53.49],[-14,51.07],[-13,48.78],[-12,46.59],[-11,44.52],[-10,42.54],[-9,40.66],[-8,38.88],[-7,37.17],[-6,35.56],[-5,34.01],[-4,32.55],[-3,31.15],[-2,29.82],[-1,28.55],[0,27.35],[1,26.2],[2,25.1],[3,24.06],[4,23.07],[5,22.12],[6,21.21],[7,20.35],[8,19.52],[9,18.73],[10,17.98],[11,17.25],[12,16.64],[13,16.06],[14,15.49],[15,14.95],[16,14.42],[17,13.91],[18,13.42],[19,12.95],[20,12.5],[21,12.06],[22,11.63],[23,11.22],[24,10.83],[25,10.45],[26,10.08],[27,9.73],[28,9.38],[29,9.05],[30,8.74],[31,8.43],[32,8.13],[33,7.85],[34,7.57],[35,7.3],[36,7.05],[37,6.8],[38,6.56],[39,6.33],[40,6.11],[41,5.89],[42,5.69],[43,5.49],[44,5.29],[45,5.11],[46,4.93],[47,4.75],[48,4.59],[49,4.43],[50,4.27],[51,4.12],[52,3.97],[53,3.83],[54,3.7],[55,3.57],[56,3.44],[57,3.32],[58,3.21],[59,3.09],[60,2.98],[61,2.88],[62,2.78],[63,2.68],[64,2.59],[65,2.5],[66,2.4],[67,2.319],[68,2.248],[69,2.185],[70,2.126],[71,2.069],[72,2.013],[73,1.957],[74,1.901],[75,1.845],[76,1.789],[77,1.735],[78,1.686],[79,1.644],[80,1.612],[81,1.5541],[82,1.5191],[83,1.4864],[84,1.4557],[85,1.4269],[86,1.4],[87,1.3749],[88,1.3514],[89,1.3295],[90,1.309] ]
 function adcToTemp(adcValue) {
-  // 断路或短路保护
   if (adcValue <= 0) return -50; 
   if (adcValue >= 4095) return 120;
-
-  // 根据硬件：3.3V - 10k(R1) - ADC - NTC(Rt) - GND
-  // 公式：V_ADC = 3.3 * (Rt / (10 + Rt)) => Rt = 10 * ADC / (4095 - ADC) 
   let rt = (10 * adcValue) / (4095 - adcValue);
-
-  // 查表法找温度（表里阻值是递减的，温度递增）
-  if (rt >= NTC_TABLE[0][1]) return NTC_TABLE[0][0]; // 比表里最冷的还冷
-  if (rt <= NTC_TABLE[NTC_TABLE.length - 1][1]) return NTC_TABLE[NTC_TABLE.length - 1][0]; // 比最热的还热
-
+  if (rt >= NTC_TABLE[0][1]) return NTC_TABLE[0][0]; 
+  if (rt <= NTC_TABLE[NTC_TABLE.length - 1][1]) return NTC_TABLE[NTC_TABLE.length - 1][0]; 
   for (let i = 0; i < NTC_TABLE.length - 1; i++) {
-    let t1 = NTC_TABLE[i][0], r1 = NTC_TABLE[i][1];
-    let t2 = NTC_TABLE[i+1][0], r2 = NTC_TABLE[i+1][1];
-    // 寻找区间，进行线性插值
-    if (rt <= r1 && rt >= r2) {
-      let fraction = (r1 - rt) / (r1 - r2);
-      return t1 + fraction * (t2 - t1);
+    if (rt <= NTC_TABLE[i][1] && rt >= NTC_TABLE[i+1][1]) {
+      let fraction = (NTC_TABLE[i][1] - rt) / (NTC_TABLE[i][1] - NTC_TABLE[i+1][1]);
+      return NTC_TABLE[i][0] + fraction * (NTC_TABLE[i+1][0] - NTC_TABLE[i][0]);
     }
   }
   return 0;
 }
-
-// 计算温度计遮罩的宽度百分比 (范围: -50 到 120, 跨度 170度)
-const getThermoCoverWidth = (temp) => {
-  let clamped = Math.max(-50, Math.min(120, temp));
-  let pct = ((clamped + 50) / 170) * 100;
-  return (100 - pct).toFixed(1) + '%';
-}
-// =========================================================================
+const getThermoCoverWidth = (temp) => ((100 - (((Math.max(-50, Math.min(120, temp)) + 50) / 170) * 100)).toFixed(1) + '%')
 
 const addLog = (msg, packet = null) => {
   const now = new Date()
@@ -262,7 +255,6 @@ const addLog = (msg, packet = null) => {
 }
 
 const formatHex = (arr) => Array.from(arr).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ')
-
 const sendSerialData = (buffer) => {
   latestTx.value = formatHex(buffer)
   window.electronAPI.sendData(buffer)
@@ -270,9 +262,7 @@ const sendSerialData = (buffer) => {
 
 function buildPacket(opType, page, addr, dataArr =[]) {
   const len = Math.max(1, dataArr.length)
-  if (dataArr.length === 0) {
-    for(let i=0; i<len; i++) dataArr.push(0x00)
-  }
+  if (dataArr.length === 0) for(let i=0; i<len; i++) dataArr.push(0x00)
   const packet =[0x5A, 0x5A, opType, len, page, addr & 0xFF, (addr >> 8) & 0xFF, ...dataArr]
   let sum = 0
   for (let i = 2; i < packet.length; i++) sum += packet[i]
@@ -289,9 +279,7 @@ const refreshPorts = async () => {
   availablePorts.value = ports.filter(p => p.toLowerCase().includes('usb'));
   if (availablePorts.value.length > 0 && !availablePorts.value.includes(selectedPort.value)) {
     selectedPort.value = availablePorts.value[0];
-  } else if (availablePorts.value.length === 0) {
-    selectedPort.value = '';
-  }
+  } else if (availablePorts.value.length === 0) selectedPort.value = '';
 }
 
 onMounted(async () => {
@@ -308,12 +296,8 @@ onMounted(async () => {
           let packet = rxBuffer.splice(0, expectedLen)
           latestRx.value = formatHex(packet)
           parseIncomingPacket(packet)
-        } else {
-          break;
-        }
-      } else {
-        rxBuffer.shift()
-      }
+        } else break;
+      } else rxBuffer.shift()
     }
   })
 })
@@ -326,18 +310,118 @@ const toggleConnection = async () => {
     clearInterval(pollingTimer)
   } else {
     const success = await window.electronAPI.connectPort(selectedPort.value, true)
-    if (success) {
-      addLog(`串口 ${selectedPort.value} 连接成功`)
-      const authPacket = buildPacket(0x01, 2, 0, new Array(4).fill(0))
-      sendSerialData(authPacket)
-      addLog(`请求验证设备识别码`, authPacket) 
+    if (!success) { addLog(`串口 ${selectedPort.value} 连接失败`); return; }
+
+    addLog(`串口已打开，正在校验设备合法性...`)
+    const authPacket = buildPacket(0x01, 2, 0, new Array(4).fill(0))
+    sendSerialData(authPacket)
+
+    try {
+      const authData = await new Promise((resolve, reject) => {
+        resolveAuth = resolve;
+        setTimeout(() => { resolveAuth = null; reject('timeout'); }, 1500); 
+      });
       
-      setTimeout(() => {
-        isConnected.value = true
-        startPolling()
-      }, 500)
-    } else {
-      addLog(`串口 ${selectedPort.value} 连接失败`)
+      if (getU32(authData, 0) !== 0xABCD) throw new Error('invalid_id');
+      addLog(`设备校验通过!`)
+
+      addLog(`正在同步下位机运行参数...`)
+      const syncPacket = buildPacket(0x01, 0, 0, new Array(15).fill(0));
+      sendSerialData(syncPacket);
+
+      const syncData = await new Promise((resolve, reject) => {
+        resolveSync = resolve;
+        setTimeout(() => { resolveSync = null; reject('timeout'); }, 1500);
+      });
+
+      mainPowerSwitch.value = (syncData[0] !== 0);
+      ch1.triggerMode = syncData[1];
+      ch1.setCurr = Number(dacToCurr(getU16(syncData, 2)).toFixed(2));
+      ch1.setMaxTime = getU32(syncData, 4) / 1000;
+      ch2.triggerMode = syncData[8];
+      ch2.setCurr = Number(dacToCurr(getU16(syncData, 9)).toFixed(2));
+      ch2.setMaxTime = getU32(syncData, 11) / 1000;
+      addLog(`参数同步完成!`)
+
+      isConnected.value = true
+      startPolling()
+
+    } catch (e) {
+      await window.electronAPI.connectPort(selectedPort.value, false)
+      alert("设备校验失败，请检查是否选择了正确的串口或固件是否匹配！");
+      addLog(`设备校验失败，自动断开连接`);
+    }
+  }
+}
+
+// 解析
+function parseIncomingPacket(packet) {
+  let op = packet[2];
+  let opLen = packet[3];
+  let page = packet[4];
+  let addr = packet[5] | (packet[6] << 8);
+  let data = packet.slice(7, 7 + opLen);
+
+  if (op === 0x01) { 
+    // A. 日常心跳轮询 (包含故障提取)
+    if (page === 2 && addr === 0 && opLen >= 29) {
+      if(!isConnected.value) return; 
+      uptime.value = getU32(data, 4)
+      sysInVoltage.value = (getU16(data, 12) / 4095 * 3.3) * 11 
+
+      ch1.realCurr = (getU16(data, 14) / 4095 * 3.3) * 2
+      ch1.realVolt = (getU16(data, 16) / 4095 * 3.3) * 11
+      if(data[18] === 0) ch1.isOn = false;
+
+      ch2.realCurr = (getU16(data, 19) / 4095 * 3.3) * 2
+      ch2.realVolt = (getU16(data, 21) / 4095 * 3.3) * 11
+      if(data[23] === 0) ch2.isOn = false;
+
+      temp1.value = adcToTemp(getU16(data, 24))
+      temp2.value = adcToTemp(getU16(data, 26))
+
+      // 提取故障码和警告码
+      faultCode.value = data[8];
+      warnCode.value = data[11];
+
+      // 只要发生致命故障，单片机底层就会强制关闭总开关，此时强制 UI 同步关闭！
+      if (data[8] !== 0) {
+        mainPowerSwitch.value = false;
+      }
+      
+      let fMsg =[];
+      if (data[8] & (1<<0)) fMsg.push("T1过热");
+      if (data[8] & (1<<1)) fMsg.push("T1断连或过冷");
+      if (data[8] & (1<<2)) fMsg.push("T2过热");
+      if (data[8] & (1<<3)) fMsg.push("T2断连或过冷");
+      if (data[8] & (1<<4)) fMsg.push("输入电压过高");
+      if (data[8] & (1<<5)) fMsg.push("输入电压过低");
+      if (data[8] & (1<<6)) fMsg.push("CH1电路异常");
+      if (data[8] & (1<<7)) fMsg.push("CH2电路异常");
+      faultMsg.value = fMsg.join(" | ");
+
+      let wMsg =[];
+      if (data[11] & (1<<0)) wMsg.push("CH1未接负载");
+      if (data[11] & (1<<1)) wMsg.push("CH2未接负载");
+      warnMsg.value = wMsg.join(" | ");
+
+      let extTrig = data[28] !== 0 ? 1 : 0
+      extTriggerHistory.shift()
+      extTriggerHistory.push(extTrig)
+      updateCharts()
+    } 
+    // B. 设备校验返回
+    else if (page === 2 && addr === 0 && opLen === 4) {
+      if (resolveAuth) { resolveAuth(data); resolveAuth = null; }
+    }
+    // C. 同步参数返回 
+    else if (page === 0 && addr === 0 && opLen === 15) {
+      if (resolveSync) { resolveSync(data); resolveSync = null; }
+    }
+    // D. 修改参数后的回读验证返回 
+    else if (page === 0) {
+      let idx = pendingVerifies.findIndex(p => p.page === page && p.addr === addr);
+      if (idx !== -1) pendingVerifies.splice(idx, 1)[0].resolve({ data, packet });
     }
   }
 }
@@ -349,119 +433,118 @@ function startPolling() {
   }, 200)
 }
 
-function parseIncomingPacket(packet) {
-  if(packet[2] === 0x01 && packet[4] === 0x02 && packet[5] === 0x00 && packet[6] === 0x00) {
-    const data = packet.slice(7, packet.length - 1)
-    if(getU32(data, 0) !== 0xABCD && !isConnected.value) return;
+// 写入验证机制
+const writeAndVerify = async (page, addr, dataArr, logName) => {
+  const wPkt = buildPacket(0x00, page, addr, dataArr)
+  sendSerialData(wPkt)
+  addLog(`尝试修改 ${logName}...`, wPkt)
 
-    uptime.value = getU32(data, 4)
-    sysInVoltage.value = (getU16(data, 12) / 4095 * 3.3) * 11 
+  await new Promise(r => setTimeout(r, 100)); // 等待EEPROM和单片机逻辑响应
 
-    ch1.realCurr = (getU16(data, 14) / 4095 * 3.3) * 2
-    ch1.realVolt = (getU16(data, 16) / 4095 * 3.3) * 11
-    if(data[18] === 0) ch1.isOn = false;
+  const rPkt = buildPacket(0x01, page, addr, new Array(dataArr.length).fill(0))
+  sendSerialData(rPkt)
 
-    ch2.realCurr = (getU16(data, 19) / 4095 * 3.3) * 2
-    ch2.realVolt = (getU16(data, 21) / 4095 * 3.3) * 11
-    if(data[23] === 0) ch2.isOn = false;
+  try {
+    const { data: readData, packet: rawPacket } = await new Promise((resolve, reject) => {
+      pendingVerifies.push({ page, addr, resolve });
+      setTimeout(() => { 
+        pendingVerifies = pendingVerifies.filter(p => p.resolve !== resolve); 
+        reject('timeout'); 
+      }, 1000);
+    });
 
-    // 获取精确温度
-    temp1.value = adcToTemp(getU16(data, 24))
-    temp2.value = adcToTemp(getU16(data, 26))
+    addLog(`验证读取原始数据`, rawPacket)
 
-    let extTrig = data[28] !== 0 ? 1 : 0
-    extTriggerHistory.shift()
-    extTriggerHistory.push(extTrig)
+    let match = true;
+    for(let i=0; i<dataArr.length; i++) {
+      if (readData[i] !== dataArr[i]) match = false;
+    }
 
-    updateCharts()
+    if (match) {
+      addLog(`${logName} 修改成功!`)
+    } else {
+      addLog(`【失败】${logName} 验证不一致! 上位机已恢复为下位机真实状态。`)
+      revertUI(page, addr, readData)
+    }
+  } catch(e) {
+    addLog(`【超时】${logName} 修改验证未响应!`)
   }
 }
 
-const onMainPowerChange = () => {
-  const p = buildPacket(0x00, 0, 0,[mainPowerSwitch.value ? 1 : 0])
-  sendSerialData(p)
-  addLog(mainPowerSwitch.value ? '强电总开关打开' : '强电总开关关闭', p)
+// 回滚UI
+const revertUI = (page, addr, data) => {
+  if (page === 0) {
+    if(addr === 0) mainPowerSwitch.value = (data[0] !== 0);
+    if(addr === 1) ch1.triggerMode = data[0];
+    if(addr === 2) ch1.setCurr = Number(dacToCurr(getU16(data, 0)).toFixed(2));
+    if(addr === 4) ch1.setMaxTime = getU32(data, 0) / 1000;
+    if(addr === 8) ch2.triggerMode = data[0];
+    if(addr === 9) ch2.setCurr = Number(dacToCurr(getU16(data, 0)).toFixed(2));
+    if(addr === 11) ch2.setMaxTime = getU32(data, 0) / 1000;
+  }
 }
 
 const currToDac = (A) => Math.round(((A / 2) / 3.3) * 4095)
+const dacToCurr = (dac) => ((dac / 4095) * 3.3) * 2
+
+const onMainPowerChange = () => writeAndVerify(0, 0,[mainPowerSwitch.value ? 1 : 0], '强电总开关');
 
 const updateCh1Current = () => {
   let dac = currToDac(ch1.setCurr)
-  const p = buildPacket(0x00, 0, 2,[dac & 0xFF, (dac >> 8) & 0xFF])
-  sendSerialData(p)
-  addLog(`通道1电流设置更改为 ${ch1.setCurr}A`, p)
+  writeAndVerify(0, 2,[dac & 0xFF, (dac >> 8) & 0xFF], `通道1电流(${ch1.setCurr}A)`)
 }
 const updateCh2Current = () => {
   let dac = currToDac(ch2.setCurr)
-  const p = buildPacket(0x00, 0, 9,[dac & 0xFF, (dac >> 8) & 0xFF])
-  sendSerialData(p)
-  addLog(`通道2电流设置更改为 ${ch2.setCurr}A`, p)
+  writeAndVerify(0, 9,[dac & 0xFF, (dac >> 8) & 0xFF], `通道2电流(${ch2.setCurr}A)`)
 }
 
 const updateCh1Time = () => {
   let ms = ch1.setMaxTime * 1000
-  const p = buildPacket(0x00, 0, 4,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF])
-  sendSerialData(p)
-  addLog(`通道1单次输出时长更改为 ${ch1.setMaxTime}s`, p)
+  writeAndVerify(0, 4,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道1时长(${ch1.setMaxTime}s)`)
 }
 const updateCh2Time = () => {
   let ms = ch2.setMaxTime * 1000
-  const p = buildPacket(0x00, 0, 11,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF])
-  sendSerialData(p)
-  addLog(`通道2单次输出时长更改为 ${ch2.setMaxTime}s`, p)
+  writeAndVerify(0, 11,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道2时长(${ch2.setMaxTime}s)`)
 }
 
-const updateCh1Trigger = () => {
-  const p = buildPacket(0x00, 0, 1, [ch1.triggerMode])
-  sendSerialData(p)
-  addLog(`通道1触发模式更改为 ${ch1.triggerMode === 0 ? '内触发' : '外触发'}`, p)
-}
-const updateCh2Trigger = () => {
-  const p = buildPacket(0x00, 0, 8,[ch2.triggerMode])
-  sendSerialData(p)
-  addLog(`通道2触发模式更改为 ${ch2.triggerMode === 0 ? '内触发' : '外触发'}`, p)
+const updateCh1Trigger = () => writeAndVerify(0, 1,[ch1.triggerMode], `通道1触发模式`);
+const updateCh2Trigger = () => writeAndVerify(0, 8,[ch2.triggerMode], `通道2触发模式`);
+
+// 【修改点】尝试清除故障码功能
+const clearFaults = () => {
+  const p = buildPacket(0x00, 1, 0, [1]);
+  sendSerialData(p);
+  addLog('发送尝试清除故障指令', p);
 }
 
 const toggleCh1 = () => {
   if(ch1.isOn) {
-    const p = buildPacket(0x00, 1, 3, [1])
-    sendSerialData(p)
-    startCountdown(ch1)
-    addLog('通道1开始输出', p)
+    const p = buildPacket(0x00, 1, 3, [1]); sendSerialData(p);
+    startCountdown(ch1); addLog('通道1开始输出', p)
   } else {
-    const p = buildPacket(0x00, 1, 4,[1])
-    sendSerialData(p)
-    ch1.countdown = 0
-    addLog('通道1停止输出', p)
+    const p = buildPacket(0x00, 1, 4,[1]); sendSerialData(p);
+    ch1.countdown = 0; addLog('通道1停止输出', p)
   }
 }
 const toggleCh2 = () => {
   if(ch2.isOn) {
-    const p = buildPacket(0x00, 1, 5, [1])
-    sendSerialData(p)
-    startCountdown(ch2)
-    addLog('通道2开始输出', p)
+    const p = buildPacket(0x00, 1, 5,[1]); sendSerialData(p);
+    startCountdown(ch2); addLog('通道2开始输出', p)
   } else {
-    const p = buildPacket(0x00, 1, 6, [1])
-    sendSerialData(p)
-    ch2.countdown = 0
-    addLog('通道2停止输出', p)
+    const p = buildPacket(0x00, 1, 6,[1]); sendSerialData(p);
+    ch2.countdown = 0; addLog('通道2停止输出', p)
   }
 }
 
 const syncOpen = () => {
-  const p = buildPacket(0x00, 1, 1,[1])
-  sendSerialData(p)
+  const p = buildPacket(0x00, 1, 1,[1]); sendSerialData(p);
   ch1.isOn = true; ch2.isOn = true
-  startCountdown(ch1); startCountdown(ch2)
-  addLog('合控触发：双通道同开', p)
+  startCountdown(ch1); startCountdown(ch2); addLog('合控：双通道同开', p)
 }
 const syncClose = () => {
-  const p = buildPacket(0x00, 1, 2, [1])
-  sendSerialData(p)
+  const p = buildPacket(0x00, 1, 2, [1]); sendSerialData(p);
   ch1.isOn = false; ch2.isOn = false
-  ch1.countdown = 0; ch2.countdown = 0
-  addLog('合控触发：双通道同关', p)
+  ch1.countdown = 0; ch2.countdown = 0; addLog('合控：双通道同关', p)
 }
 
 function startCountdown(ch) {
@@ -476,34 +559,16 @@ const formatTime = (s) => `${String(Math.floor(s/3600)).padStart(2,'0')}:${Strin
 
 function initCharts() {
   eChartVoltage = echarts.init(chartVoltage.value)
-  eChartVoltage.setOption({ 
-    series:[{ 
-      type: 'gauge', min: 0, max: 30, splitNumber: 6, // 刻度变少，防拥挤
-      axisLabel: { fontSize: 11, distance: -20 }, // 字体变小
-      detail: {show: false}, 
-      data: [{value: 0}], 
-      axisLine: { lineStyle: { width: 10 } } 
-    }]
-  })
+  eChartVoltage.setOption({ series:[{ type: 'gauge', min: 0, max: 30, splitNumber: 6, axisLabel: { fontSize: 11, distance: -20 }, detail: {show: false}, data: [{value: 0}], axisLine: { lineStyle: { width: 10 } } }]})
   
   eChartWave = echarts.init(chartWave.value)
   eChartWave.setOption({ 
-    // 加上坐标轴边框和网格范围
+    animation: false,  // <==== 【就是加上这一行，关闭该图表的补间动画】
+
     grid: { left: 25, right: 15, top: 20, bottom: 25, show: true, borderColor: '#ddd' }, 
-    xAxis: { 
-      type: 'category', show: true, 
-      axisLabel: { show: false }, // X轴不显示字，只显示线框
-      axisTick: { show: false } 
-    }, 
-    yAxis: { 
-      type: 'value', min: -0.3, max: 1.3, show: true, 
-      splitLine: { show: true, lineStyle: { type: 'dashed' } },
-      axisLabel: { fontSize: 10 } 
-    }, 
-    series:[{ 
-      type: 'line', step: 'start', data: extTriggerHistory, 
-      itemStyle: {color: '#409eff'}, areaStyle: { color: 'rgba(64,158,255,0.1)' } 
-    }] 
+    xAxis: { type: 'category', show: true, axisLabel: { show: false }, axisTick: { show: false } }, 
+    yAxis: { type: 'value', min: -0.3, max: 1.3, show: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, axisLabel: { fontSize: 10 } }, 
+    series:[{ type: 'line', step: 'start', data: extTriggerHistory, itemStyle: {color: '#409eff'}, areaStyle: { color: 'rgba(64,158,255,0.1)' } }] 
   })
 }
 
@@ -532,16 +597,22 @@ function updateCharts() {
 .chart { width: 100%; flex: 1; }
 .value-text { font-size: 18px; font-weight: bold; margin-top: -10px; z-index: 10; text-align: center;}
 
-/* ===== 自定义横排温度计 CSS ===== */
 .thermo-container { width: 90%; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .thermo-track { position: relative; width: 100%; height: 18px; border-radius: 9px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); background-color: #f0f0f0;}
 .thermo-gradient { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: linear-gradient(to right, #1890ff 0%, #52c41a 30%, #faad14 60%, #f5222d 100%); }
 .thermo-cover { position: absolute; right: 0; top: 0; height: 100%; background: #e0e0e0; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-left: 2px solid #fff;}
 .thermo-axis { display: flex; justify-content: space-between; width: 100%; font-size: 11px; color: #666; margin-top: 5px; }
-/* ================================= */
 
-.row-3 { justify-content: center; background-color: #fafafa; }
-.row-4 { align-items: stretch; }
+/* 故障与报警区样式 */
+.row-3 { justify-content: center; background-color: #fafafa; transition: background-color 0.3s;}
+.fault-bg { background-color: #fff0f0; border-color: #ffcccc; }
+.fault-box { margin-left: 20px; display: flex; align-items: center; gap: 15px; }
+.fault-text { color: #d93025; font-weight: bold; font-size: 14px;}
+.warn-box { margin-left: 20px; }
+.warn-text { color: #faad14; font-weight: bold; font-size: 14px;}
+.btn-clear { padding: 5px 12px; border:none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;}
+
+.row-4 { align-items: stretch; transition: opacity 0.3s; }
 .col { flex: 1; padding: 10px 20px; border-right: 1px solid #eee; }
 .col:last-child { border-right: none; }
 .center-col { flex: 0.3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
