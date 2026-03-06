@@ -332,7 +332,9 @@ function getU32(arr, idx) { return (arr[idx] | (arr[idx+1]<<8) | (arr[idx+2]<<16
 const refreshPorts = async () => {
   if (isConnected.value) return;
   const ports = await window.electronAPI.getPorts();
-  availablePorts.value = ports.filter(p => p.toLowerCase().includes('usb'));
+  // 【修改点】：同时兼容 Mac的usb 和 Windows的com 格式，或者直接不过滤也可以
+  availablePorts.value = ports.filter(p => p.toLowerCase().includes('usb') || p.toLowerCase().includes('com')); 
+  
   if (availablePorts.value.length > 0 && !availablePorts.value.includes(selectedPort.value)) {
     selectedPort.value = availablePorts.value[0];
   } else if (availablePorts.value.length === 0) selectedPort.value = '';
