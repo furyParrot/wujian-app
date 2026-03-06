@@ -38,5 +38,22 @@
     "electron-squirrel-startup": "^1.0.1",
     "serialport": "^13.0.0",
     "vue": "^3.5.29"
+  },
+  "build": {
+    "appId": "com.wujian.app",
+    "productName": "恒流源控制台",
+    "directories": {
+      "output": "release"
+    },
+    "files":[
+      ".vite/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "requestExecutionLevel": "admin"
+    }
   }
 }
