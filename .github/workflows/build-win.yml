@@ -2,21 +2,21 @@ name: Build Windows EXE
 
 on:
   push:
-    branches: [ "main", "master" ] # 当你把代码推送到主分支时自动触发打包
-  workflow_dispatch: # 允许你在网页上手动点击按钮触发打包
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest # 关键：使用微软的 Windows 服务器
+    runs-on: windows-latest
 
     steps:
     - name: Check out Git repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4   # 升级到了 v4
 
     - name: Install Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4 # 升级到了 v4
       with:
-        node-version: 20 # 使用 Node 20
+        node-version: 20
         cache: 'npm'
 
     - name: Install Dependencies
@@ -26,7 +26,7 @@ jobs:
       run: npm run build:win
 
     - name: Upload EXE Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4 # 升级到了 v4
       with:
         name: Windows-EXE
         path: release/*.exe
