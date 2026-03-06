@@ -35,7 +35,7 @@
               <div class="thermo-cover" :style="{ width: getThermoCoverWidth(temp1) }"></div>
             </div>
             <div class="thermo-axis">
-              <span>-50</span><span>0</span><span>50</span><span>100</span><span>120</span>
+              <span>-50</span><span>0</span><span>50</span><span>100</span><span>150</span>
             </div>
           </div>
           <div class="value-text">T1: {{ temp1.toFixed(1) }}℃</div>
@@ -48,7 +48,7 @@
               <div class="thermo-cover" :style="{ width: getThermoCoverWidth(temp2) }"></div>
             </div>
             <div class="thermo-axis">
-              <span>-50</span><span>0</span><span>50</span><span>100</span><span>120</span>
+              <span>-50</span><span>0</span><span>50</span><span>100</span><span>150</span>
             </div>
           </div>
           <div class="value-text">T2: {{ temp2.toFixed(1) }}℃</div>
@@ -84,14 +84,15 @@
         <!-- 通道 1 -->
         <div class="col channel-col">
           <h3 class="col-title">通道1</h3>
-          <div class="control-item">
+          <div class="control-item tooltip-box">
             <span class="label-text">电流设置(A):</span>
-            <input class="input-elem" type="number" step="0.01" min="0" max="3" v-model.lazy="ch1.setCurr" @change="updateCh1Current">
+            <input class="input-elem" type="number" step="0.01" min="0.2" max="3" v-model.lazy="ch1.setCurr" @change="updateCh1Current">
+            <span class="tooltip">请输入0.2-3之间的数字。</span>
           </div>
           <div class="control-item tooltip-box">
             <span class="label-text">单次输出(s):</span>
-            <input class="input-elem" type="number" min="0" max="10000" v-model.lazy="ch1.setMaxTime" @change="updateCh1Time">
-            <span class="tooltip">请输入0-10000之间的数字。将换算成ms写入page0地址4-7</span>
+            <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch1.setMaxTime" @change="updateCh1Time">
+            <span class="tooltip">请输入0.001-100之间的数字。</span>
           </div>
           <div class="control-item">
             <span class="label-text">开关模式:</span>
@@ -100,16 +101,42 @@
               <option :value="1">外触发</option>
             </select>
           </div>
-          <div class="control-item">
-            <span class="label-text">输出开关:</span>
-            <div class="switch-wrapper">
-              <label class="switch-container small">
-                <input type="checkbox" v-model="ch1.isOn" @change="toggleCh1">
-                <span class="slider"></span>
-              </label>
-              <span class="countdown" v-if="ch1.isOn">{{ ch1.countdown }} s</span>
+          
+          <!-- 脉冲/单次 Tab 区域 -->
+          <div class="pulse-tabs">
+            <div class="ptab-headers">
+              <span :class="{'active': ch1.tab === 0}" @click="switchTab(1, 0)">单次输出</span>
+              <span :class="{'active': ch1.tab === 1}" @click="switchTab(1, 1)">脉冲输出</span>
+            </div>
+            <div class="ptab-content" v-if="ch1.tab === 0">
+              <div class="control-item">
+                <span class="label-text">输出开关:</span>
+                <div class="switch-wrapper">
+                  <label class="switch-container small">
+                    <input type="checkbox" v-model="ch1.isOn" @change="toggleCh1">
+                    <span class="slider"></span>
+                  </label>
+                  <span class="countdown" v-if="ch1.isOn">{{ ch1.countdown }} s</span>
+                </div>
+              </div>
+            </div>
+            <div class="ptab-content" v-if="ch1.tab === 1">
+              <div class="control-item">
+                <span class="label-text">脉冲间隔(s):</span>
+                <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch1.pulseInterval" @change="updateCh1PulseInterval">
+              </div>
+              <div class="control-item">
+                <span class="label-text">脉冲开关:</span>
+                <div class="switch-wrapper">
+                  <label class="switch-container small">
+                    <input type="checkbox" v-model="ch1.pulseOn" @change="togglePulse(1)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
+
           <div class="control-item">
             <span class="label-text">实时电流:</span>
             <span class="val-text">{{ ch1.realCurr.toFixed(2) }} A</span>
@@ -125,19 +152,23 @@
           <h3 class="col-title">合控</h3>
           <button class="btn-sync" @click="syncOpen">同开</button>
           <button class="btn-sync btn-danger" @click="syncClose">同关</button>
+          <!-- 新增脉冲合控 -->
+          <button class="btn-sync" style="margin-top: 15px;" @click="syncPulseOpen">脉冲开</button>
+          <button class="btn-sync btn-danger" @click="syncPulseClose">脉冲关</button>
         </div>
 
         <!-- 通道 2 -->
         <div class="col channel-col">
           <h3 class="col-title">通道2</h3>
-          <div class="control-item">
+          <div class="control-item tooltip-box">
             <span class="label-text">电流设置(A):</span>
-            <input class="input-elem" type="number" step="0.01" min="0" max="3" v-model.lazy="ch2.setCurr" @change="updateCh2Current">
+            <input class="input-elem" type="number" step="0.01" min="0.2" max="3" v-model.lazy="ch2.setCurr" @change="updateCh2Current">
+            <span class="tooltip">请输入0.2-3之间的数字。</span>
           </div>
           <div class="control-item tooltip-box">
             <span class="label-text">单次输出(s):</span>
-            <input class="input-elem" type="number" min="0" max="10000" v-model.lazy="ch2.setMaxTime" @change="updateCh2Time">
-            <span class="tooltip">请输入0-10000的数字...</span>
+            <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch2.setMaxTime" @change="updateCh2Time">
+            <span class="tooltip">请输入0.001-100之间的数字。</span>
           </div>
           <div class="control-item">
             <span class="label-text">开关模式:</span>
@@ -146,16 +177,42 @@
               <option :value="1">外触发</option>
             </select>
           </div>
-          <div class="control-item">
-            <span class="label-text">输出开关:</span>
-            <div class="switch-wrapper">
-              <label class="switch-container small">
-                <input type="checkbox" v-model="ch2.isOn" @change="toggleCh2">
-                <span class="slider"></span>
-              </label>
-              <span class="countdown" v-if="ch2.isOn">{{ ch2.countdown }} s</span>
+
+          <!-- 脉冲/单次 Tab 区域 -->
+          <div class="pulse-tabs">
+            <div class="ptab-headers">
+              <span :class="{'active': ch2.tab === 0}" @click="switchTab(2, 0)">单次输出</span>
+              <span :class="{'active': ch2.tab === 1}" @click="switchTab(2, 1)">脉冲输出</span>
+            </div>
+            <div class="ptab-content" v-if="ch2.tab === 0">
+              <div class="control-item">
+                <span class="label-text">输出开关:</span>
+                <div class="switch-wrapper">
+                  <label class="switch-container small">
+                    <input type="checkbox" v-model="ch2.isOn" @change="toggleCh2">
+                    <span class="slider"></span>
+                  </label>
+                  <span class="countdown" v-if="ch2.isOn">{{ ch2.countdown }} s</span>
+                </div>
+              </div>
+            </div>
+            <div class="ptab-content" v-if="ch2.tab === 1">
+              <div class="control-item">
+                <span class="label-text">脉冲间隔(s):</span>
+                <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch2.pulseInterval" @change="updateCh2PulseInterval">
+              </div>
+              <div class="control-item">
+                <span class="label-text">脉冲开关:</span>
+                <div class="switch-wrapper">
+                  <label class="switch-container small">
+                    <input type="checkbox" v-model="ch2.pulseOn" @change="togglePulse(2)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
+
           <div class="control-item">
             <span class="label-text">实时电流:</span>
             <span class="val-text">{{ ch2.realCurr.toFixed(2) }} A</span>
@@ -205,9 +262,8 @@ const temp2 = ref(0)
 const extTriggerHistory = reactive(Array(25).fill(0))
 const mainPowerSwitch = ref(false)
 
-const ch1 = reactive({ setCurr: 0, setMaxTime: 0, triggerMode: 0, isOn: false, countdown: 0, realCurr: 0, realVolt: 0 })
-const ch2 = reactive({ setCurr: 0, setMaxTime: 0, triggerMode: 0, isOn: false, countdown: 0, realCurr: 0, realVolt: 0 })
-
+const ch1 = reactive({ setCurr: 0, setMaxTime: 0, triggerMode: 0, isOn: false, countdown: 0, realCurr: 0, realVolt: 0, tab: 0, pulseInterval: 1, pulseOn: false })
+const ch2 = reactive({ setCurr: 0, setMaxTime: 0, triggerMode: 0, isOn: false, countdown: 0, realCurr: 0, realVolt: 0, tab: 0, pulseInterval: 1, pulseOn: false })
 const logs = ref([])
 const latestTx = ref('')
 const latestRx = ref('')
@@ -483,29 +539,44 @@ const revertUI = (page, addr, data) => {
     if(addr === 11) ch2.setMaxTime = getU32(data, 0) / 1000;
   }
 }
-
+// 增加输入校验函数
+const validateVal = (val, min, max, msg) => {
+  let num = Number(val);
+  if (isNaN(num)) num = min;
+  if (num > max) { alert(msg); return max; }
+  if (num < min) { alert(msg); return min; }
+  return num;
+}
 const currToDac = (A) => Math.round(((A / 2) / 3.3) * 4095)
 const dacToCurr = (dac) => ((dac / 4095) * 3.3) * 2
 
 const onMainPowerChange = () => writeAndVerify(0, 0,[mainPowerSwitch.value ? 1 : 0], '强电总开关');
 
 const updateCh1Current = () => {
+  ch1.setCurr = validateVal(ch1.setCurr, 0.2, 3, '电流范围为0.2-3A');
   let dac = currToDac(ch1.setCurr)
   writeAndVerify(0, 2,[dac & 0xFF, (dac >> 8) & 0xFF], `通道1电流(${ch1.setCurr}A)`)
 }
 const updateCh2Current = () => {
+  ch2.setCurr = validateVal(ch2.setCurr, 0.2, 3, '电流范围为0.2-3A');
   let dac = currToDac(ch2.setCurr)
-  writeAndVerify(0, 9,[dac & 0xFF, (dac >> 8) & 0xFF], `通道2电流(${ch2.setCurr}A)`)
+  writeAndVerify(0, 9, [dac & 0xFF, (dac >> 8) & 0xFF], `通道2电流(${ch2.setCurr}A)`)
 }
 
 const updateCh1Time = () => {
-  let ms = ch1.setMaxTime * 1000
+  ch1.setMaxTime = validateVal(ch1.setMaxTime, 0.001, 100, '时间范围为0.001-100s');
+  let ms = Math.round(ch1.setMaxTime * 1000)
   writeAndVerify(0, 4,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道1时长(${ch1.setMaxTime}s)`)
 }
 const updateCh2Time = () => {
-  let ms = ch2.setMaxTime * 1000
+  ch2.setMaxTime = validateVal(ch2.setMaxTime, 0.001, 100, '时间范围为0.001-100s');
+  let ms = Math.round(ch2.setMaxTime * 1000)
   writeAndVerify(0, 11,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道2时长(${ch2.setMaxTime}s)`)
 }
+
+// 新增脉冲间隔输入的校验和更新
+const updateCh1PulseInterval = () => { ch1.pulseInterval = validateVal(ch1.pulseInterval, 0.001, 100, '时间范围为0.001-100s'); }
+const updateCh2PulseInterval = () => { ch2.pulseInterval = validateVal(ch2.pulseInterval, 0.001, 100, '时间范围为0.001-100s'); }
 
 const updateCh1Trigger = () => writeAndVerify(0, 1,[ch1.triggerMode], `通道1触发模式`);
 const updateCh2Trigger = () => writeAndVerify(0, 8,[ch2.triggerMode], `通道2触发模式`);
@@ -546,7 +617,91 @@ const syncClose = () => {
   ch1.isOn = false; ch2.isOn = false
   ch1.countdown = 0; ch2.countdown = 0; addLog('合控：双通道同关', p)
 }
+// 切换 Tab 处理逻辑
+const switchTab = (chNum, tabIdx) => {
+  const ch = chNum === 1 ? ch1 : ch2;
+  if (ch.tab === tabIdx) return;
+  
+  if (tabIdx === 1) { // 切换到脉冲
+    if (ch.isOn) {
+      const p = buildPacket(0x00, 1, chNum === 1 ? 4 : 6, [1]);
+      sendSerialData(p);
+      ch.isOn = false;
+      ch.countdown = 0;
+      addLog(`通道${chNum}切换脉冲模式，主动停止当前输出`, p);
+    }
+  } else { // 切换到单次
+    if (ch.pulseOn) {
+      ch.pulseOn = false; // 这会让正在运行的 while 循环自动退出并发送 stop 指令
+    }
+  }
+  ch.tab = tabIdx;
+}
 
+// 供延时和硬件故障阻断使用的软中断检查
+const waitWithCheck = async (ch, ms) => {
+  let steps = Math.floor(ms / 20);
+  let remainder = ms % 20;
+  for(let i = 0; i < steps; i++) {
+    // 一旦关闭总开关、关闭脉冲或出现故障，立刻熔断延时
+    if(!ch.pulseOn || !mainPowerSwitch.value || faultCode.value !== 0) return false;
+    await new Promise(r => setTimeout(r, 20));
+  }
+  if(remainder > 0) {
+    if(!ch.pulseOn || !mainPowerSwitch.value || faultCode.value !== 0) return false;
+    await new Promise(r => setTimeout(r, remainder));
+  }
+  return (ch.pulseOn && mainPowerSwitch.value && faultCode.value === 0);
+}
+
+// 脉冲开关控制逻辑
+const togglePulse = async (chNum) => {
+  const ch = chNum === 1 ? ch1 : ch2;
+  if (ch.pulseOn) {
+    addLog(`通道${chNum}脉冲开启`);
+    
+    // 开始死循环脉冲
+    while (ch.pulseOn && mainPowerSwitch.value && faultCode.value === 0) {
+      // 1. 发送开启指令
+      const pStart = buildPacket(0x00, 1, chNum === 1 ? 3 : 5, [1]);
+      sendSerialData(pStart);
+      
+      // 2. 等待设定时间(s)
+      let keepGoing = await waitWithCheck(ch, Math.round(ch.setMaxTime * 1000));
+      if (!keepGoing) break; // 期间被阻断，退出循环
+
+      // 3. 发送停止指令
+      const pStop = buildPacket(0x00, 1, chNum === 1 ? 4 : 6,[1]);
+      sendSerialData(pStop);
+      
+      // 4. 等待脉冲间隔(s)
+      keepGoing = await waitWithCheck(ch, Math.round(ch.pulseInterval * 1000));
+      if (!keepGoing) break;
+    }
+
+    // 循环退出后，如果是故障导致退出的，也要强制复位UI状态
+    ch.pulseOn = false;
+    
+    // 保底：无论以什么方式退出循环，必须下发一条彻底关闭的指令
+    const pStopFinal = buildPacket(0x00, 1, chNum === 1 ? 4 : 6, [1]);
+    sendSerialData(pStopFinal);
+    addLog(`通道${chNum}脉冲已关闭`);
+  }
+}
+
+// 脉冲合控
+const syncPulseOpen = () => {
+  switchTab(1, 1);
+  switchTab(2, 1);
+  if (!ch1.pulseOn) { ch1.pulseOn = true; togglePulse(1); }
+  if (!ch2.pulseOn) { ch2.pulseOn = true; togglePulse(2); }
+}
+const syncPulseClose = () => {
+  switchTab(1, 1);
+  switchTab(2, 1);
+  ch1.pulseOn = false; 
+  ch2.pulseOn = false;
+}
 function startCountdown(ch) {
   ch.countdown = ch.setMaxTime
   let t = setInterval(() => {
@@ -652,4 +807,41 @@ input:disabled + .slider { background-color: #e0e0e0; cursor: not-allowed; }
 .log-item:last-child { border-bottom: none; }
 .hex-box { flex: 1; }
 .hex-content { padding: 15px; font-family: 'Courier New', Courier, monospace; color: #0066cc; font-weight: bold; word-break: break-all; font-size: 14px; }
+/* 脉冲与单次控制内部 Tab 样式 */
+.pulse-tabs {
+  margin: 15px 0;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+.ptab-headers {
+  display: flex;
+  border-bottom: 1px solid #dcdfe6;
+  background-color: #f5f7fa;
+}
+.ptab-headers span {
+  flex: 1;
+  text-align: center;
+  padding: 6px 0;
+  font-size: 13px;
+  cursor: pointer;
+  color: #606266;
+  transition: all 0.3s;
+}
+.ptab-headers span:first-child {
+  border-right: 1px solid #dcdfe6;
+}
+.ptab-headers span:hover {
+  color: #409eff;
+}
+.ptab-headers span.active {
+  background-color: #fff;
+  color: #409eff;
+  font-weight: bold;
+  border-bottom: 2px solid #409eff;
+}
+.ptab-content {
+  padding: 10px;
+  background-color: #fff;
+}
 </style>
