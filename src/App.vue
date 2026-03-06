@@ -91,8 +91,8 @@
           </div>
           <div class="control-item tooltip-box">
             <span class="label-text">单次输出(s):</span>
-            <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch1.setMaxTime" @change="updateCh1Time">
-            <span class="tooltip">请输入0.001-100之间的数字。</span>
+            <input class="input-elem" type="number" step="0.001" min="0.005" max="100" v-model.lazy="ch1.setMaxTime" @change="updateCh1Time">
+            <span class="tooltip">请输入0.005-100之间的数字。</span>
           </div>
           <div class="control-item">
             <span class="label-text">开关模式:</span>
@@ -123,7 +123,7 @@
             <div class="ptab-content" v-if="ch1.tab === 1">
               <div class="control-item">
                 <span class="label-text">脉冲间隔(s):</span>
-                <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch1.pulseInterval" @change="updateCh1PulseInterval">
+                <input class="input-elem" type="number" step="0.001" min="0.005" max="100" v-model.lazy="ch1.pulseInterval" @change="updateCh1PulseInterval">
               </div>
               <div class="control-item">
                 <span class="label-text">脉冲开关:</span>
@@ -167,8 +167,8 @@
           </div>
           <div class="control-item tooltip-box">
             <span class="label-text">单次输出(s):</span>
-            <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch2.setMaxTime" @change="updateCh2Time">
-            <span class="tooltip">请输入0.001-100之间的数字。</span>
+            <input class="input-elem" type="number" step="0.001" min="0.005" max="100" v-model.lazy="ch2.setMaxTime" @change="updateCh2Time">
+            <span class="tooltip">请输入0.005-100之间的数字。</span>
           </div>
           <div class="control-item">
             <span class="label-text">开关模式:</span>
@@ -199,7 +199,7 @@
             <div class="ptab-content" v-if="ch2.tab === 1">
               <div class="control-item">
                 <span class="label-text">脉冲间隔(s):</span>
-                <input class="input-elem" type="number" step="0.001" min="0.001" max="100" v-model.lazy="ch2.pulseInterval" @change="updateCh2PulseInterval">
+                <input class="input-elem" type="number" step="0.001" min="0.005" max="100" v-model.lazy="ch2.pulseInterval" @change="updateCh2PulseInterval">
               </div>
               <div class="control-item">
                 <span class="label-text">脉冲开关:</span>
@@ -564,19 +564,19 @@ const updateCh2Current = () => {
 }
 
 const updateCh1Time = () => {
-  ch1.setMaxTime = validateVal(ch1.setMaxTime, 0.001, 100, '时间范围为0.001-100s');
+  ch1.setMaxTime = validateVal(ch1.setMaxTime, 0.005, 100, '时间范围为0.005-100s');
   let ms = Math.round(ch1.setMaxTime * 1000)
   writeAndVerify(0, 4,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道1时长(${ch1.setMaxTime}s)`)
 }
 const updateCh2Time = () => {
-  ch2.setMaxTime = validateVal(ch2.setMaxTime, 0.001, 100, '时间范围为0.001-100s');
+  ch2.setMaxTime = validateVal(ch2.setMaxTime, 0.005, 100, '时间范围为0.005-100s');
   let ms = Math.round(ch2.setMaxTime * 1000)
   writeAndVerify(0, 11,[ms & 0xFF, (ms>>8)&0xFF, (ms>>16)&0xFF, (ms>>24)&0xFF], `通道2时长(${ch2.setMaxTime}s)`)
 }
 
 // 新增脉冲间隔输入的校验和更新
-const updateCh1PulseInterval = () => { ch1.pulseInterval = validateVal(ch1.pulseInterval, 0.001, 100, '时间范围为0.001-100s'); }
-const updateCh2PulseInterval = () => { ch2.pulseInterval = validateVal(ch2.pulseInterval, 0.001, 100, '时间范围为0.001-100s'); }
+const updateCh1PulseInterval = () => { ch1.pulseInterval = validateVal(ch1.pulseInterval, 0.005, 100, '时间范围为0.005-100s'); }
+const updateCh2PulseInterval = () => { ch2.pulseInterval = validateVal(ch2.pulseInterval, 0.005, 100, '时间范围为0.005-100s'); }
 
 const updateCh1Trigger = () => writeAndVerify(0, 1,[ch1.triggerMode], `通道1触发模式`);
 const updateCh2Trigger = () => writeAndVerify(0, 8,[ch2.triggerMode], `通道2触发模式`);
