@@ -90,3 +90,11 @@ typings/
 
 # Electron-Forge
 out/
+node_modules/
+.DS_Store
+dist/
+dist-electron/
+out/
+release/
+.vite/
+*.exe
